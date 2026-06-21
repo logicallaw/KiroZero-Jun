@@ -6,7 +6,7 @@ import {
   ingredientPlans,
   type IngredientPlan,
   type Recipe,
-  type RetailerQuote,
+  type Retailer,
 } from "./data/ingredientPlans";
 import { formatWon, perMealCost } from "./lib/format";
 
@@ -42,9 +42,7 @@ function youtubeSearchUrl(query: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
-function retailerSearchUrl(retailer: RetailerQuote["retailer"], plan: IngredientPlan): string {
-  const query = plan.cartItems.map((item) => item.name).join(" ");
-
+function retailerSearchUrl(retailer: Retailer, query: string): string {
   if (retailer === "쿠팡") {
     return `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
   }
@@ -191,6 +189,25 @@ function PlanImpact({ plan }: { plan: IngredientPlan }) {
   );
 }
 
+function CarbonSaving({ plan }: { plan: IngredientPlan }) {
+  const carbonSavingPerDeliveryKg = 0.6;
+  const replacedDeliveryCount = Math.max(1, Math.round(plan.carbonSavingKg / carbonSavingPerDeliveryKg));
+
+  return (
+    <div className="carbon-saving">
+      <div className="carbon-main">
+        <span>배달 1번 줄이면</span>
+        <strong>약 {carbonSavingPerDeliveryKg.toFixed(1)}kg CO₂e</strong>
+      </div>
+      <p>이 플랜은 배달 약 {replacedDeliveryCount}번을 장보기로 바꿔 총 {plan.carbonSavingKg.toFixed(1)}kg CO₂e 절감을 기대할 수 있어요.</p>
+      <div className="carbon-tags">
+        <span>일회용기 감소</span>
+        <span>음식물 쓰레기 감소</span>
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({ plan, onNavigate }: { plan: IngredientPlan; onNavigate: (to: string) => void }) {
   return (
     <article className="plan-card">
@@ -289,7 +306,7 @@ function CuratedPlanCarousel({ onNavigate }: { onNavigate: (to: string) => void 
   return (
     <section className="curation-section">
       <div className="section-heading compact">
-        <h2>이번주는 배달보다 요리는 어떠신가요?</h2>
+        <h2 className="home-title">이번주는 배달보다 요리는 어떠신가요?</h2>
       </div>
       <article
         className={`curation-card slide-${slideDirection}`}
@@ -302,10 +319,20 @@ function CuratedPlanCarousel({ onNavigate }: { onNavigate: (to: string) => void 
         <div className="curation-copy">
           <p className="eyebrow">{activePlan.summary}</p>
           <h3>{activePlan.ingredientName}</h3>
-          {/* <p>
-            배달로 먹으면 {formatWon(activePlan.deliveryCostEstimate)}, 장보기로 준비하면{" "}
-            {formatWon(activePlan.groceryCost)}이에요. 필요한 재료를 바로 장바구니로 담아볼 수 있어요.
-          </p> */}
+          <div className="curation-preview">
+            <div className="ingredient-strip">
+              <span>장바구니 재료</span>
+              <p>{activePlan.cartItems.slice(0, 4).map((item) => item.name).join(", ")}</p>
+            </div>
+            <div className="curation-menu">
+              <span>이 재료로 가능한 요리</span>
+              <div className="recipe-chip-list">
+                {activePlan.recipes.slice(0, 3).map((recipe) => (
+                  <strong key={recipe.id}>{recipe.name}</strong>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="curation-actions">
             <NavLink to={`/cart?plan=${activePlan.id}`} className="button primary" onNavigate={onNavigate}>
               식재료 바로 구매
@@ -317,22 +344,10 @@ function CuratedPlanCarousel({ onNavigate }: { onNavigate: (to: string) => void 
         </div>
         <div className="curation-visual">
           <PlanImpact plan={activePlan} />
+          <CarbonSaving plan={activePlan} />
           <div className="curation-kicker">
             <span>이 장보기로</span>
             <strong>{activePlan.days}일 {activePlan.meals}끼</strong>
-          </div>
-          <div className="ingredient-strip">
-            <span>장바구니 재료</span>
-            <p>{activePlan.cartItems.slice(0, 4).map((item) => item.name).join(", ")}</p>
-          </div>
-          <div className="curation-menu">
-            <span>이 재료로 가능한 요리</span>
-            {activePlan.recipes.slice(0, 3).map((recipe) => (
-              <p key={recipe.id}>
-                <strong>{recipe.minutes}분</strong>
-                {recipe.name}
-              </p>
-            ))}
           </div>
         </div>
       </article>
@@ -443,65 +458,104 @@ function PlanDetailPage({ planId, onNavigate }: { planId: string; onNavigate: (t
 
 function CartPage({ planId, onNavigate }: { planId: string; onNavigate: (to: string) => void }) {
   const plan = getPlan(planId);
-  const total = plan.cartItems.reduce((sum, item) => sum + item.price, 0);
-  const bestQuote = plan.retailerQuotes.reduce((best, quote) => (quote.totalPrice < best.totalPrice ? quote : best));
+  const cheapestItems = plan.cartItems.map((item) => {
+    const cheapest = item.purchaseOptions.reduce((best, option) => (option.price < best.price ? option : best));
+    return { item, cheapest };
+  });
+  const cheapestTotal = cheapestItems.reduce((sum, entry) => sum + entry.cheapest.price, 0);
+  const storeCounts = cheapestItems.reduce<Record<Retailer, number>>(
+    (counts, entry) => {
+      counts[entry.cheapest.retailer] += 1;
+      return counts;
+    },
+    { 쿠팡: 0, 마켓컬리: 0 },
+  );
 
   return (
     <div className="page-stack">
       <section className="section-heading">
         <p className="eyebrow">식재료 바로 구매</p>
-        <h1>{plan.ingredientName} 장보기 비교</h1>
-        <p>필요한 재료를 한 사이트에서 살 수 있도록 구매 후보를 비교했어요. 최종 가격은 이동한 사이트에서 확인하세요.</p>
+        <h1 className="cart-title">{plan.ingredientName} {plan.days}일 {plan.meals}끼 식재료 구매</h1>
+        <p>필요한 재료별로 최저가와 구매 링크를 정리했어요. 최종 가격과 재고는 이동한 사이트에서 확인하세요.</p>
       </section>
-      <section className="retailer-section">
-        <div className="retailer-heading">
+      <section className="cheapest-section">
+        <div className="cheapest-heading">
           <div>
-            <p className="eyebrow">추천 구매처</p>
-            <h2>{bestQuote.retailer}에서 시작하는 게 좋아요.</h2>
+            <p className="eyebrow">최저 조합</p>
+            <h2>재료별 최저가로 담으면 이 정도예요.</h2>
           </div>
-          <strong>{formatWon(bestQuote.totalPrice)}</strong>
+          <strong>{formatWon(cheapestTotal)}</strong>
         </div>
-        <div className="retailer-grid">
-          {plan.retailerQuotes.map((quote) => (
-            <article className={quote.retailer === bestQuote.retailer ? "retailer-card selected" : "retailer-card"} key={quote.retailer}>
-              <div className="retailer-card-top">
-                <span>{quote.badge}</span>
-                <h3>{quote.retailer}</h3>
-              </div>
-              <strong>{formatWon(quote.totalPrice)}</strong>
-              <p>{quote.deliveryNote}</p>
-              <a className="button primary full" href={retailerSearchUrl(quote.retailer, plan)} target="_blank" rel="noreferrer">
-                {quote.retailer}에서 바로 구매
-              </a>
-            </article>
-          ))}
+        <div className="cheapest-breakdown">
+          <span>쿠팡 {storeCounts.쿠팡}개</span>
+          <span>마켓컬리 {storeCounts.마켓컬리}개</span>
+          <span>{plan.cartItems.length}개 식재료 비교</span>
+        </div>
+        <div className="purchase-outcome">
+          <div>
+            <span>구매 후 해결</span>
+            <strong>{plan.days}일 {plan.meals}끼</strong>
+          </div>
+          <div>
+            <span>가능한 요리</span>
+            <div className="outcome-recipes">
+              {plan.recipes.slice(0, 3).map((recipe) => (
+                <span className="recipe-calc-chip" tabIndex={0} key={recipe.id}>
+                  {recipe.name}
+                  <span className="recipe-tooltip" role="tooltip">
+                    <strong>사용 재료</strong>
+                    {recipe.cartCalculation.map((item) => (
+                      <span className="recipe-usage-row" key={`${recipe.id}-${item.ingredient}`}>
+                        <em>{item.ingredient}</em>
+                        <b>{item.amount}</b>
+                      </span>
+                    ))}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
       <section className="cart-layout">
         <div className="cart-list">
           {plan.cartItems.map((item) => (
             <article className="cart-item" key={item.id}>
-              <div>
-                <h3>{item.name}</h3>
-                <p>{item.quantity} · {item.usedIn.join(", ")}</p>
+              <div className="cart-item-main">
+                <div>
+                  <h3>{item.name}</h3>
+                  <p>{item.quantity}</p>
+                </div>
+                <div className="cart-meta">
+                  <strong>{formatWon(Math.min(...item.purchaseOptions.map((option) => option.price)))}</strong>
+                  <span>{item.expectedUseBy}</span>
+                </div>
               </div>
-              <div className="cart-meta">
-                <strong>{formatWon(item.price)}</strong>
-                <span>{item.expectedUseBy}</span>
+              <div className="purchase-options">
+                {item.purchaseOptions.map((option) => {
+                  const isCheapest = option.price === Math.min(...item.purchaseOptions.map((candidate) => candidate.price));
+
+                  return (
+                    <a
+                      className={isCheapest ? "purchase-option cheapest" : "purchase-option"}
+                      href={retailerSearchUrl(option.retailer, option.query)}
+                      target="_blank"
+                      rel="noreferrer"
+                      key={`${item.id}-${option.retailer}`}
+                    >
+                      <span>{option.retailer}</span>
+                      <strong>{formatWon(option.price)}</strong>
+                      {isCheapest && <em>최저</em>}
+                    </a>
+                  );
+                })}
               </div>
             </article>
           ))}
         </div>
         <aside className="cart-summary">
-          <span>예상 합계</span>
-          <strong>{formatWon(total)}</strong>
-          <p>이미 집에 있는 재료는 빼고 구매할 수 있어요.</p>
-          <div className="option-grid">
-            <button type="button">있는 재료 빼기</button>
-            <button type="button">더 저렴하게</button>
-            <button type="button">냉동 위주</button>
-            <button type="button">조리 더 쉽게</button>
-          </div>
+          <span>합계</span>
+          <strong>{formatWon(cheapestTotal)}</strong>
           <NavLink to={`/fridge?plan=${plan.id}`} className="button primary full" onNavigate={onNavigate}>
             구매하기
           </NavLink>

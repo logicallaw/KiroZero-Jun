@@ -10,6 +10,10 @@ export type Recipe = {
   usageLift: string;
   deliverySaving: number;
   youtubeQuery: string;
+  cartCalculation: Array<{
+    ingredient: string;
+    amount: string;
+  }>;
 };
 
 export type CartItem = {
@@ -20,10 +24,19 @@ export type CartItem = {
   usedIn: string[];
   expectedUseBy: string;
   canReplace: boolean;
+  purchaseOptions: PurchaseOption[];
+};
+
+export type Retailer = "쿠팡" | "마켓컬리";
+
+export type PurchaseOption = {
+  retailer: Retailer;
+  price: number;
+  query: string;
 };
 
 export type RetailerQuote = {
-  retailer: "쿠팡" | "마켓컬리";
+  retailer: Retailer;
   totalPrice: number;
   deliveryNote: string;
   badge: string;
@@ -39,6 +52,7 @@ export type IngredientPlan = {
   groceryCost: number;
   deliveryCostEstimate: number;
   deliverySaving: number;
+  carbonSavingKg: number;
   averageCookingMinutes: number;
   freshFoodUsageRate: number;
   riskLevel: string;
@@ -61,6 +75,7 @@ export const ingredientPlans: IngredientPlan[] = [
     groceryCost: 18900,
     deliveryCostEstimate: 43000,
     deliverySaving: 24100,
+    carbonSavingKg: 1.8,
     averageCookingMinutes: 12,
     freshFoodUsageRate: 92,
     riskLevel: "낮음",
@@ -85,6 +100,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "42%에서 68%",
         deliverySaving: 9000,
         youtubeQuery: "제육볶음 레시피",
+        cartCalculation: [
+          { ingredient: "돼지고기 앞다리살", amount: "약 120g" },
+          { ingredient: "손질 대파", amount: "약 15g" },
+          { ingredient: "밥", amount: "1공기" },
+          { ingredient: "고추장", amount: "1큰술" },
+        ],
       },
       {
         id: "pork-kimchi-stew",
@@ -102,6 +123,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "68%에서 84%",
         deliverySaving: 8500,
         youtubeQuery: "돼지고기 김치찌개 레시피",
+        cartCalculation: [
+          { ingredient: "돼지고기 앞다리살", amount: "약 100g" },
+          { ingredient: "소포장 김치", amount: "약 150g" },
+          { ingredient: "두부", amount: "1/2모" },
+          { ingredient: "손질 대파", amount: "약 15g" },
+        ],
       },
       {
         id: "soy-pork-fried-rice",
@@ -119,6 +146,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "84%에서 92%",
         deliverySaving: 7600,
         youtubeQuery: "돼지고기 김치볶음밥 레시피",
+        cartCalculation: [
+          { ingredient: "돼지고기 앞다리살", amount: "약 80g" },
+          { ingredient: "소포장 김치", amount: "약 150g" },
+          { ingredient: "계란", amount: "1구" },
+          { ingredient: "밥", amount: "1공기" },
+        ],
       },
       {
         id: "soy-pork-stir-fry",
@@ -136,6 +169,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "84%에서 92%",
         deliverySaving: 8000,
         youtubeQuery: "간장 돼지고기 볶음 레시피",
+        cartCalculation: [
+          { ingredient: "돼지고기 앞다리살", amount: "남은 양" },
+          { ingredient: "손질 대파", amount: "약 10g" },
+          { ingredient: "간장", amount: "1큰술" },
+          { ingredient: "밥", amount: "1공기" },
+        ],
       },
     ],
     cartItems: [
@@ -147,6 +186,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["제육볶음", "돼지고기 김치찌개", "돼지고기 김치볶음밥"],
         expectedUseBy: "3일 내 소진",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 6900, query: "돼지고기 앞다리살 300g" },
+          { retailer: "마켓컬리", price: 7800, query: "돼지고기 앞다리살 300g" },
+        ],
       },
       {
         id: "green-onion-50g",
@@ -156,6 +199,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["제육볶음", "간장 돼지고기 볶음"],
         expectedUseBy: "3일 내 소진",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 1500, query: "손질 대파 50g" },
+          { retailer: "마켓컬리", price: 1900, query: "손질 대파" },
+        ],
       },
       {
         id: "tofu-for-stew",
@@ -165,6 +212,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["돼지고기 김치찌개"],
         expectedUseBy: "2일 내 권장",
         canReplace: false,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 2500, query: "두부 1모" },
+          { retailer: "마켓컬리", price: 2200, query: "두부 1모" },
+        ],
       },
       {
         id: "kimchi-small-pork",
@@ -174,6 +225,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["돼지고기 김치찌개", "돼지고기 김치볶음밥"],
         expectedUseBy: "여유 있음",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 2200, query: "소포장 김치 300g" },
+          { retailer: "마켓컬리", price: 2900, query: "소포장 김치 300g" },
+        ],
       },
       {
         id: "eggs-6",
@@ -183,6 +238,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["간장 돼지고기 볶음밥", "비상식"],
         expectedUseBy: "여유 있음",
         canReplace: false,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 5800, query: "계란 6구" },
+          { retailer: "마켓컬리", price: 5900, query: "계란 6구" },
+        ],
       },
     ],
     retailerQuotes: [
@@ -210,6 +269,7 @@ export const ingredientPlans: IngredientPlan[] = [
     groceryCost: 13300,
     deliveryCostEstimate: 36000,
     deliverySaving: 22700,
+    carbonSavingKg: 1.3,
     averageCookingMinutes: 7,
     freshFoodUsageRate: 95,
     riskLevel: "매우 낮음",
@@ -233,6 +293,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "35%에서 54%",
         deliverySaving: 7000,
         youtubeQuery: "간장계란밥 레시피",
+        cartCalculation: [
+          { ingredient: "계란", amount: "2구" },
+          { ingredient: "즉석밥", amount: "1개" },
+          { ingredient: "간장", amount: "1큰술" },
+          { ingredient: "참기름", amount: "조금" },
+        ],
       },
       {
         id: "spam-egg-fried-rice",
@@ -250,6 +316,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "54%에서 72%",
         deliverySaving: 7200,
         youtubeQuery: "스팸 계란볶음밥 레시피",
+        cartCalculation: [
+          { ingredient: "계란", amount: "2구" },
+          { ingredient: "스팸 작은 캔", amount: "1/2개" },
+          { ingredient: "즉석밥", amount: "1개" },
+          { ingredient: "손질 대파", amount: "약 15g" },
+        ],
       },
       {
         id: "steamed-egg",
@@ -267,6 +339,11 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "72%에서 86%",
         deliverySaving: 6200,
         youtubeQuery: "계란찜 레시피",
+        cartCalculation: [
+          { ingredient: "계란", amount: "3구" },
+          { ingredient: "물", amount: "계란과 1:1" },
+          { ingredient: "소금", amount: "조금" },
+        ],
       },
       {
         id: "rolled-egg",
@@ -284,6 +361,11 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "86%에서 95%",
         deliverySaving: 6800,
         youtubeQuery: "계란말이 레시피",
+        cartCalculation: [
+          { ingredient: "계란", amount: "3구" },
+          { ingredient: "손질 대파", amount: "약 10g" },
+          { ingredient: "소금", amount: "조금" },
+        ],
       },
     ],
     cartItems: [
@@ -295,6 +377,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["간장계란밥", "스팸 계란볶음밥", "계란찜", "계란말이"],
         expectedUseBy: "여유 있음",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 6500, query: "계란 10구" },
+          { retailer: "마켓컬리", price: 7200, query: "계란 10구" },
+        ],
       },
       {
         id: "small-green-onion",
@@ -304,6 +390,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["스팸 계란볶음밥", "계란말이"],
         expectedUseBy: "3일 내 소진",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 1500, query: "손질 대파 50g" },
+          { retailer: "마켓컬리", price: 1900, query: "손질 대파" },
+        ],
       },
       {
         id: "instant-rice",
@@ -313,6 +403,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["간장계란밥", "스팸 계란볶음밥"],
         expectedUseBy: "보관 가능",
         canReplace: false,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 1800, query: "즉석밥 2개" },
+          { retailer: "마켓컬리", price: 2300, query: "즉석밥 2개" },
+        ],
       },
       {
         id: "spam-small",
@@ -322,6 +416,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["스팸 계란볶음밥"],
         expectedUseBy: "보관 가능",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 3500, query: "스팸 작은 캔" },
+          { retailer: "마켓컬리", price: 3700, query: "스팸 작은 캔" },
+        ],
       },
     ],
     retailerQuotes: [
@@ -349,6 +447,7 @@ export const ingredientPlans: IngredientPlan[] = [
     groceryCost: 12500,
     deliveryCostEstimate: 30500,
     deliverySaving: 18000,
+    carbonSavingKg: 1.5,
     averageCookingMinutes: 10,
     freshFoodUsageRate: 90,
     riskLevel: "낮음",
@@ -372,6 +471,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "38%에서 64%",
         deliverySaving: 7800,
         youtubeQuery: "두부김치 레시피",
+        cartCalculation: [
+          { ingredient: "두부", amount: "1모" },
+          { ingredient: "소포장 김치", amount: "약 150g" },
+        ],
       },
       {
         id: "doenjang-stew",
@@ -389,6 +492,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "64%에서 78%",
         deliverySaving: 8200,
         youtubeQuery: "두부 된장찌개 레시피",
+        cartCalculation: [
+          { ingredient: "두부", amount: "1/2모" },
+          { ingredient: "양파", amount: "1/2개" },
+          { ingredient: "손질 대파", amount: "약 20g" },
+          { ingredient: "된장", amount: "1큰술" },
+        ],
       },
       {
         id: "braised-tofu",
@@ -406,6 +515,12 @@ export const ingredientPlans: IngredientPlan[] = [
         usageLift: "78%에서 90%",
         deliverySaving: 6900,
         youtubeQuery: "두부조림 레시피",
+        cartCalculation: [
+          { ingredient: "두부", amount: "1/2모" },
+          { ingredient: "손질 대파", amount: "약 15g" },
+          { ingredient: "간장", amount: "1큰술" },
+          { ingredient: "밥", amount: "1공기" },
+        ],
       },
     ],
     cartItems: [
@@ -417,6 +532,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["두부김치", "된장찌개", "두부조림"],
         expectedUseBy: "3일 내 소진",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 5000, query: "두부 2모" },
+          { retailer: "마켓컬리", price: 4600, query: "두부 2모" },
+        ],
       },
       {
         id: "kimchi-small",
@@ -426,6 +545,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["두부김치"],
         expectedUseBy: "여유 있음",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 4500, query: "소포장 김치 300g" },
+          { retailer: "마켓컬리", price: 4300, query: "소포장 김치 300g" },
+        ],
       },
       {
         id: "onion-one",
@@ -435,6 +558,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["된장찌개"],
         expectedUseBy: "3일 내 권장",
         canReplace: false,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 1200, query: "양파 1개" },
+          { retailer: "마켓컬리", price: 1400, query: "양파 1개" },
+        ],
       },
       {
         id: "green-onion-tofu",
@@ -444,6 +571,10 @@ export const ingredientPlans: IngredientPlan[] = [
         usedIn: ["된장찌개", "두부조림"],
         expectedUseBy: "3일 내 권장",
         canReplace: true,
+        purchaseOptions: [
+          { retailer: "쿠팡", price: 1800, query: "손질 대파 50g" },
+          { retailer: "마켓컬리", price: 2200, query: "손질 대파" },
+        ],
       },
     ],
     retailerQuotes: [

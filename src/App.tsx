@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { defaultPlanId, getPlan, getRecipe, ingredientPlans, type IngredientPlan } from "./data/ingredientPlans";
+import {
+  defaultPlanId,
+  getPlan,
+  getRecipe,
+  ingredientPlans,
+  type IngredientPlan,
+  type Recipe,
+  type RetailerQuote,
+} from "./data/ingredientPlans";
 import { formatWon, perMealCost } from "./lib/format";
 
 type Route =
@@ -28,6 +36,20 @@ function parseRoute(pathname: string, search: string): Route {
 
 function href(path: string): string {
   return path;
+}
+
+function youtubeSearchUrl(query: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
+function retailerSearchUrl(retailer: RetailerQuote["retailer"], plan: IngredientPlan): string {
+  const query = plan.cartItems.map((item) => item.name).join(" ");
+
+  if (retailer === "쿠팡") {
+    return `https://www.coupang.com/np/search?q=${encodeURIComponent(query)}`;
+  }
+
+  return `https://www.kurly.com/search?sword=${encodeURIComponent(query)}`;
 }
 
 function useRoute() {
@@ -122,6 +144,53 @@ function SavingSummary({ plan }: { plan: IngredientPlan }) {
   );
 }
 
+function PlanImpact({ plan }: { plan: IngredientPlan }) {
+  const groceryRatio = Math.max(18, Math.round((plan.groceryCost / plan.deliveryCostEstimate) * 100));
+  const savingRate = Math.round((plan.deliverySaving / plan.deliveryCostEstimate) * 100);
+
+  return (
+    <div className="plan-impact">
+      <div className="impact-lead">
+        <span>배달비를 장보기로 바꾸면</span>
+        <strong>{formatWon(plan.deliverySaving)} 절약</strong>
+        <p>장보기 비용은 배달 예상 비용의 {groceryRatio}% 수준이에요.</p>
+      </div>
+      <div className="cost-switch">
+        <div className="cost-box delivery-cost">
+          <span>배달 예상</span>
+          <strong>{formatWon(plan.deliveryCostEstimate)}</strong>
+        </div>
+        <span className="cost-arrow">-&gt;</span>
+        <div className="cost-box grocery-cost">
+          <span>장보기</span>
+          <strong>{formatWon(plan.groceryCost)}</strong>
+        </div>
+      </div>
+      <div className="cost-compare" aria-label={`${plan.ingredientName} 비용 비교`}>
+        <div className="cost-row">
+          <span>배달</span>
+          <div className="cost-track">
+            <div className="cost-fill delivery" style={{ width: "100%" }} />
+          </div>
+          <strong>{formatWon(plan.deliveryCostEstimate)}</strong>
+        </div>
+        <div className="cost-row">
+          <span>장보기</span>
+          <div className="cost-track">
+            <div className="cost-fill grocery" style={{ width: `${groceryRatio}%` }} />
+          </div>
+          <strong>{formatWon(plan.groceryCost)}</strong>
+        </div>
+      </div>
+      <div className="impact-badges">
+        <span>{savingRate}% 절감</span>
+        <span>{formatWon(perMealCost(plan.groceryCost, plan.meals))} / 한 끼</span>
+        <span>소진율 {plan.freshFoodUsageRate}%</span>
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({ plan, onNavigate }: { plan: IngredientPlan; onNavigate: (to: string) => void }) {
   return (
     <article className="plan-card">
@@ -136,12 +205,7 @@ function PlanCard({ plan, onNavigate }: { plan: IngredientPlan; onNavigate: (to:
         <strong>{plan.headline}</strong>
         <span>평균 {plan.averageCookingMinutes}분</span>
       </div>
-      <div className="card-metrics">
-        <Metric label="예상 장보기" value={formatWon(plan.groceryCost)} />
-        <Metric label="배달 대비 절약" value={formatWon(plan.deliverySaving)} />
-        <Metric label="한 끼 단가" value={formatWon(perMealCost(plan.groceryCost, plan.meals))} />
-        <Metric label="소진율" value={`${plan.freshFoodUsageRate}%`} />
-      </div>
+      <PlanImpact plan={plan} />
       <div className="recipe-preview">
         <span>만들 수 있는 것</span>
         <ul>
@@ -150,58 +214,141 @@ function PlanCard({ plan, onNavigate }: { plan: IngredientPlan; onNavigate: (to:
           ))}
         </ul>
       </div>
-      <NavLink to={`/plans/${plan.id}`} className="button primary full" onNavigate={onNavigate}>
-        {plan.ctaLabel}
+      <NavLink to={`/cart?plan=${plan.id}`} className="button primary full" onNavigate={onNavigate}>
+        식재료 바로 구매
       </NavLink>
     </article>
   );
 }
 
-function HomePage({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const featured = ingredientPlans[0];
+function RecipeVideoCard({ recipe }: { recipe: Recipe }) {
+  return (
+    <article className="recipe-video-card">
+      <a
+        className="video-thumb"
+        href={youtubeSearchUrl(recipe.youtubeQuery)}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${recipe.name} 유튜브 영상 찾기`}
+      >
+        <span className="youtube-badge">YouTube</span>
+        <strong>{recipe.name}</strong>
+        <span className="play-button">▶</span>
+      </a>
+      <div className="recipe-video-body">
+        <div>
+          <h3>{recipe.name}</h3>
+          <p>{recipe.reason}</p>
+        </div>
+        <div className="recipe-meta-row">
+          <span>{recipe.minutes}분</span>
+          <span>{recipe.tools.join(", ")}</span>
+        </div>
+        <p className="ingredient-line">{recipe.usedIngredients.join(", ")}</p>
+      </div>
+    </article>
+  );
+}
+
+function CuratedPlanCarousel({ onNavigate }: { onNavigate: (to: string) => void }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<"next" | "prev">("next");
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const activePlan = ingredientPlans[activeIndex];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSlideDirection("next");
+      setActiveIndex((current) => (current + 1) % ingredientPlans.length);
+    }, 5200);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const moveSlide = (direction: "next" | "prev") => {
+    setSlideDirection(direction);
+    setActiveIndex((current) => {
+      if (direction === "next") {
+        return (current + 1) % ingredientPlans.length;
+      }
+
+      return (current - 1 + ingredientPlans.length) % ingredientPlans.length;
+    });
+  };
+
+  const handleTouchEnd = (clientX: number) => {
+    if (touchStart === null) return;
+
+    const distance = touchStart - clientX;
+    setTouchStart(null);
+
+    if (Math.abs(distance) < 42) return;
+    moveSlide(distance > 0 ? "next" : "prev");
+  };
 
   return (
+    <section className="curation-section">
+      <div className="section-heading compact">
+        <h2>이번주는 배달보다 요리는 어떠신가요?</h2>
+      </div>
+      <article
+        className={`curation-card slide-${slideDirection}`}
+        key={activePlan.id}
+        onMouseDown={(event) => setTouchStart(event.clientX)}
+        onMouseUp={(event) => handleTouchEnd(event.clientX)}
+        onTouchStart={(event) => setTouchStart(event.touches[0].clientX)}
+        onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0].clientX)}
+      >
+        <div className="curation-copy">
+          <p className="eyebrow">{activePlan.summary}</p>
+          <h3>{activePlan.ingredientName}</h3>
+          {/* <p>
+            배달로 먹으면 {formatWon(activePlan.deliveryCostEstimate)}, 장보기로 준비하면{" "}
+            {formatWon(activePlan.groceryCost)}이에요. 필요한 재료를 바로 장바구니로 담아볼 수 있어요.
+          </p> */}
+          <div className="curation-actions">
+            <NavLink to={`/cart?plan=${activePlan.id}`} className="button primary" onNavigate={onNavigate}>
+              식재료 바로 구매
+            </NavLink>
+            <NavLink to={`/plans/${activePlan.id}`} className="button secondary" onNavigate={onNavigate}>
+              추천 레시피
+            </NavLink>
+          </div>
+        </div>
+        <div className="curation-visual">
+          <PlanImpact plan={activePlan} />
+          <div className="curation-kicker">
+            <span>이 장보기로</span>
+            <strong>{activePlan.days}일 {activePlan.meals}끼</strong>
+          </div>
+          <div className="ingredient-strip">
+            <span>장바구니 재료</span>
+            <p>{activePlan.cartItems.slice(0, 4).map((item) => item.name).join(", ")}</p>
+          </div>
+          <div className="curation-menu">
+            <span>이 재료로 가능한 요리</span>
+            {activePlan.recipes.slice(0, 3).map((recipe) => (
+              <p key={recipe.id}>
+                <strong>{recipe.minutes}분</strong>
+                {recipe.name}
+              </p>
+            ))}
+          </div>
+        </div>
+      </article>
+      <div className="carousel-progress" aria-label="추천 플랜 진행 상태">
+        {ingredientPlans.map((plan, index) => (
+          <span className={index === activeIndex ? "active" : ""} key={plan.id} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HomePage({ onNavigate }: { onNavigate: (to: string) => void }) {
+  return (
     <div className="page-stack">
-      <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">이번 주 목표</p>
-          <h1>배달 2번 줄이면 약 24,000원을 아낄 수 있어요.</h1>
-          <p>
-            {featured.ingredientName} 플랜으로 장보기 한 번에 {featured.headline}할 수 있게 먹는 순서까지
-            잡아드려요.
-          </p>
-          <div className="hero-actions">
-            <NavLink to="/onboarding" className="button primary" onNavigate={onNavigate}>
-              빠른 추천 받기
-            </NavLink>
-            <NavLink to="/plans" className="button secondary" onNavigate={onNavigate}>
-              플랜 먼저 보기
-            </NavLink>
-          </div>
-        </div>
-        <div className="hero-panel">
-          <div className="panel-top">
-            <span>추천 플랜</span>
-            <strong>{featured.ingredientName}</strong>
-          </div>
-          <SavingSummary plan={featured} />
-          <div className="today-line">
-            <span>오늘 먼저 먹을 재료</span>
-            <strong>{featured.priorityIngredients.join(", ")}</strong>
-          </div>
-        </div>
-      </section>
-      <section className="section">
-        <div className="section-heading">
-          <p className="eyebrow">핵심 재료 플랜</p>
-          <h2>레시피보다 먼저, 이번 주 버티는 재료를 고르세요.</h2>
-        </div>
-        <div className="plan-grid">
-          {ingredientPlans.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} onNavigate={onNavigate} />
-          ))}
-        </div>
-      </section>
+      <CuratedPlanCarousel onNavigate={onNavigate} />
     </div>
   );
 }
@@ -263,9 +410,9 @@ function PlanDetailPage({ planId, onNavigate }: { planId: string; onNavigate: (t
     <div className="page-stack">
       <section className="detail-hero">
         <div>
-          <p className="eyebrow">재료 플랜 상세</p>
-          <h1>{plan.ingredientName} 플랜</h1>
-          <p>이 장보기로 {plan.days}일 동안 {plan.meals}끼를 해결해요.</p>
+          <p className="eyebrow">추천 레시피</p>
+          <h1>{plan.ingredientName}로 만들기 쉬운 요리</h1>
+          <p>익숙한 재료와 집에 있을 법한 양념으로 만들 수 있는 메뉴만 골랐어요.</p>
         </div>
         <SavingSummary plan={plan} />
       </section>
@@ -277,24 +424,17 @@ function PlanDetailPage({ planId, onNavigate }: { planId: string; onNavigate: (t
       </section>
       <section className="section">
         <div className="section-heading compact">
-          <p className="eyebrow">먹는 순서</p>
-          <h2>무엇부터 먹을지 먼저 정해둘게요.</h2>
+          <p className="eyebrow">YouTube recipe</p>
+          <h2>보고 따라 하기 쉬운 레시피를 찾아볼까요?</h2>
         </div>
-        <div className="timeline">
+        <div className="recipe-video-grid">
           {plan.recipes.map((recipe) => (
-            <article className="timeline-item" key={recipe.id}>
-              <span>{recipe.dayLabel}</span>
-              <div>
-                <h3>{recipe.name}</h3>
-                <p>{recipe.reason}</p>
-              </div>
-              <strong>{recipe.minutes}분</strong>
-            </article>
+            <RecipeVideoCard recipe={recipe} key={recipe.id} />
           ))}
         </div>
         <p className="coach-note">{plan.coachNote}</p>
         <NavLink to={`/cart?plan=${plan.id}`} className="button primary" onNavigate={onNavigate}>
-          장바구니 만들기
+          식재료 바로 구매
         </NavLink>
       </section>
     </div>
@@ -304,13 +444,38 @@ function PlanDetailPage({ planId, onNavigate }: { planId: string; onNavigate: (t
 function CartPage({ planId, onNavigate }: { planId: string; onNavigate: (to: string) => void }) {
   const plan = getPlan(planId);
   const total = plan.cartItems.reduce((sum, item) => sum + item.price, 0);
+  const bestQuote = plan.retailerQuotes.reduce((best, quote) => (quote.totalPrice < best.totalPrice ? quote : best));
 
   return (
     <div className="page-stack">
       <section className="section-heading">
-        <p className="eyebrow">자동 장바구니</p>
-        <h1>{plan.ingredientName} 플랜 장바구니</h1>
-        <p>1인 가구 기준으로 {plan.days}일 안에 대부분 소진되도록 구성했어요.</p>
+        <p className="eyebrow">식재료 바로 구매</p>
+        <h1>{plan.ingredientName} 장보기 비교</h1>
+        <p>필요한 재료를 한 사이트에서 살 수 있도록 구매 후보를 비교했어요. 최종 가격은 이동한 사이트에서 확인하세요.</p>
+      </section>
+      <section className="retailer-section">
+        <div className="retailer-heading">
+          <div>
+            <p className="eyebrow">추천 구매처</p>
+            <h2>{bestQuote.retailer}에서 시작하는 게 좋아요.</h2>
+          </div>
+          <strong>{formatWon(bestQuote.totalPrice)}</strong>
+        </div>
+        <div className="retailer-grid">
+          {plan.retailerQuotes.map((quote) => (
+            <article className={quote.retailer === bestQuote.retailer ? "retailer-card selected" : "retailer-card"} key={quote.retailer}>
+              <div className="retailer-card-top">
+                <span>{quote.badge}</span>
+                <h3>{quote.retailer}</h3>
+              </div>
+              <strong>{formatWon(quote.totalPrice)}</strong>
+              <p>{quote.deliveryNote}</p>
+              <a className="button primary full" href={retailerSearchUrl(quote.retailer, plan)} target="_blank" rel="noreferrer">
+                {quote.retailer}에서 바로 구매
+              </a>
+            </article>
+          ))}
+        </div>
       </section>
       <section className="cart-layout">
         <div className="cart-list">
@@ -338,7 +503,7 @@ function CartPage({ planId, onNavigate }: { planId: string; onNavigate: (to: str
             <button type="button">조리 더 쉽게</button>
           </div>
           <NavLink to={`/fridge?plan=${plan.id}`} className="button primary full" onNavigate={onNavigate}>
-            구매했다고 보기
+            구매하기
           </NavLink>
         </aside>
       </section>
